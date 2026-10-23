@@ -16,7 +16,11 @@ export async function callStoreOrdersEdge(request: Request, sessionToken: string
     };
   }
 
-  const requestOrigin = new URL(request.url).origin;
+  const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
+  const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  const requestOrigin = forwardedHost && forwardedProto
+    ? `${forwardedProto}://${forwardedHost}`
+    : new URL(request.url).origin;
   const configuredOrigins = serverEnv("STORE_PANEL_ORIGIN").split(",").map((value) => value.trim()).filter(Boolean);
   const origins = [...new Set([requestOrigin, ...configuredOrigins])];
   const ipCandidates = [request.headers.get("x-real-ip"), request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()];
