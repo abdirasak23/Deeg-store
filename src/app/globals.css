@@ -1,0 +1,8 @@
+@import "tailwindcss";
+:root{color-scheme:light;--ink:#18271e;--muted:#758278;--line:#e5ebe4;--green:#17613d;--pale:#eef5ec}
+*{box-sizing:border-box}body{margin:0;background:#f7f9f6;color:var(--ink);font-family:"Poppins",sans-serif}button,input,select{font:inherit}button{cursor:pointer}button:disabled{cursor:not-allowed}
+@keyframes deeg-new-order-alert{0%,100%{background-color:#fff9e8;box-shadow:0 0 0 0 #e5a32222}50%{background-color:#ffedbd;box-shadow:0 0 0 4px #e5a32233}}
+@keyframes deeg-overdue-order-alert{0%,100%{background-color:#fff1ef;box-shadow:0 0 0 0 #cf4a3a22}50%{background-color:#ffdeda;box-shadow:0 0 0 4px #cf4a3a33}}
+.order-alert-new{animation:deeg-new-order-alert 1.2s ease-in-out infinite}
+.order-alert-overdue{animation:deeg-overdue-order-alert 1.2s ease-in-out infinite}
+@media(prefers-reduced-motion:reduce){.order-alert-new,.order-alert-overdue{animation:none;outline:2px solid currentColor}}
