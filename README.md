@@ -26,6 +26,30 @@ The order API keeps the HttpOnly session in Next.js, then sends the order operat
 
 The single order function source is at `../supabase/functions/store-orders/index.ts`. Deploy that one function after applying the SQL migrations. In Supabase Edge Function settings, set `STORE_PROXY_SECRET` to the same 32+ character value as the Next.js server. `STORE_PANEL_ORIGIN` can be set to the exact panel origin for CORS headers, but signed Next.js server-to-server calls are authenticated by HMAC and are not rejected by browser CORS rules. The function reads Supabase's built-in `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` secrets.
 
+## Store opening schedule
+
+Apply `../supabase/migrations/20261024000000_store_operating_hours.sql` and `../supabase/migrations/20261024010000_store_east_africa_timezone.sql` in the Supabase SQL Editor. The Store Panel header then has an Open/Close control and an Opening schedule editor. Each weekday supports up to four windows, including a midday break; windows may cross midnight. Empty days are closed. Store hours, order timestamps and dashboard daily totals use East Africa Time (`Africa/Nairobi`), independent of the computer's timezone. The schedule timezone can still be changed per store in the editor.
+
+Enable the Supabase `pg_cron` extension, then run this once in the SQL Editor to automatically apply opening and closing changes every minute (the database job keeps working when the panel is closed):
+
+```sql
+create extension if not exists pg_cron;
+select cron.schedule(
+  'deeg-refresh-store-open-status',
+  '* * * * *',
+  'select public.refresh_store_open_status();'
+);
+```
+
+If that job already exists, update it instead of creating a duplicate:
+
+```sql
+select cron.unschedule(jobid) from cron.job where jobname = 'deeg-refresh-store-open-status';
+select cron.schedule('deeg-refresh-store-open-status', '* * * * *', 'select public.refresh_store_open_status();');
+```
+
+The manual Close store control stays closed until the next scheduled opening. Manual Open opens immediately and stays open until the next scheduled closing (or 24 hours when no hours are configured). The `store-hours-listener` Edge Function source is deliberately self-contained for pasting into the Supabase Dashboard editor; it does not import `_shared` files. Set `STORE_HOURS_SCHEDULER_SECRET` to a random secret of at least 32 characters in Edge Function secrets before deploying it. Send that value as `x-store-hours-scheduler-secret` on a POST request for a manual refresh. Supabase provides `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` to the function. The database cron job above is the automatic schedule runner and does not need this custom secret.
+
 From the repository root, link the intended Supabase project once, set the two function secrets using your ignored local secrets file, then deploy only this order function:
 
 ```powershell

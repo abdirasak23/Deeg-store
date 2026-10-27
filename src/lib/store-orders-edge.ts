@@ -9,10 +9,14 @@ export async function callStoreOrdersEdge(request: Request, sessionToken: string
   const supabaseUrl = serverEnv("SUPABASE_URL") || serverEnv("NEXT_PUBLIC_SUPABASE_URL");
   const anonKey = serverEnv("SUPABASE_ANON_KEY") || serverEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
   const proxySecret = serverEnv("STORE_PROXY_SECRET");
-  if (!supabaseUrl || !anonKey || proxySecret.length < 32) {
+  const missing: string[] = [];
+  if (!supabaseUrl) missing.push("SUPABASE_URL");
+  if (!anonKey) missing.push("SUPABASE_ANON_KEY");
+  if (proxySecret.length < 32) missing.push("STORE_PROXY_SECRET (at least 32 characters)");
+  if (missing.length) {
     return {
       status: 503,
-      data: { error: "Order Edge Function is not configured. Set the Supabase URL, anon key, and STORE_PROXY_SECRET on the Store Panel server." },
+      data: { error: `Order Edge Function server settings are missing or invalid: ${missing.join(", ")}. Set them in the Store Panel Render service and redeploy.` },
     };
   }
 

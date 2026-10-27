@@ -5,13 +5,27 @@ import { serviceDb } from "@/lib/db";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const STORE_TIME_ZONE = "Africa/Nairobi";
+function storeDateKey(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: STORE_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(date);
+  const get = (type: string) => parts.find(part => part.type === type)?.value ?? "00";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+}
+function shiftDateKey(key: string, days: number) {
+  const date = new Date(`${key}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
 export async function GET() {
   const session = await readStoreSession();
   if ("response" in session) return session.response;
   try {
     const db = serviceDb();
     const storeId = session.auth.store.id;
-    const since = new Date(); since.setUTCDate(since.getUTCDate() - 29); since.setUTCHours(0, 0, 0, 0);
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const [ordersResult, inventoryResult] = await Promise.all([
       db.from("orders").select("id,status,created_at,total").eq("store_id", storeId).gte("created_at", since.toISOString()).order("created_at", { ascending: true }).limit(5000),
       db.from("store_product_availability").select("product_id,stock_quantity,in_stock").eq("store_id", storeId),
@@ -24,15 +38,13 @@ export async function GET() {
       console.error("Dashboard inventory query failed:", inventoryResult.error.code, inventoryResult.error.message);
       return fail(inventoryResult.error.code === "42703" ? "Inventory quantity is missing. Apply the inventory migration." : "Could not load inventory analytics.", 500, inventoryResult.error.code);
     }
-    const daily = Array.from({ length: 7 }, (_, i) => {
-      const date = new Date(); date.setUTCHours(0, 0, 0, 0); date.setUTCDate(date.getUTCDate() - (6 - i));
-      return { date: date.toISOString().slice(0, 10), orders: 0, revenue: 0 };
-    });
+    const today = storeDateKey(new Date());
+    const daily = Array.from({ length: 7 }, (_, i) => ({ date: shiftDateKey(today, i - 6), orders: 0, revenue: 0 }));
     const byDate = new Map(daily.map(row => [row.date, row]));
     const orderStatus: Record<string, number> = { placed: 0, confirmed: 0, packed: 0, assigned: 0, on_the_way: 0, delivered: 0, cancelled: 0 };
     let revenue30d = 0;
     for (const order of ordersResult.data ?? []) {
-      const key = new Date(order.created_at).toISOString().slice(0, 10);
+      const key = storeDateKey(new Date(order.created_at));
       const day = byDate.get(key);
       if (day) day.orders += 1;
       if (order.status in orderStatus) orderStatus[order.status] += 1;
